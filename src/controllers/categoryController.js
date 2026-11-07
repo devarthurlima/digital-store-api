@@ -1,5 +1,49 @@
 const { Category } = require("../models");
 
+async function search(req, res) {
+  try {
+    const { limit = 12, page = 1, fields, use_in_menu } = req.query;
+
+    const parsedLimit = parseInt(limit, 10);
+    const parsedPage = parseInt(page, 10);
+
+    const where = {};
+    if (use_in_menu !== undefined) {
+      where.use_in_menu = use_in_menu === "true";
+    }
+
+    let attributes = ["id", "name", "slug", "use_in_menu"];
+    if (fields) {
+      attributes = fields
+        .split(",")
+        .map((f) => f.trim())
+        .filter(Boolean);
+    }
+
+    const queryOptions = {
+      where,
+      attributes,
+    };
+
+    if (parsedLimit !== -1) {
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+    }
+
+    const { rows: data, count: total } =
+      await Category.findAndCountAll(queryOptions);
+
+    return res.status(200).json({
+      data,
+      total,
+      limit: parsedLimit,
+      page: parsedLimit === -1 ? 1 : parsedPage,
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
+
 async function create(req, res) {
   try {
     const { name, slug, use_in_menu } = req.body;
@@ -91,6 +135,7 @@ async function remove(req, res) {
 }
 
 module.exports = {
+  search,
   create,
   getById,
   update,

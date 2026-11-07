@@ -7,5 +7,7 @@ const router = Router();
 router.get("/category/:id", categoryController.getById);
 
 router.post("/category", authMiddleware, categoryController.create);
+router.put("/category/:id", authMiddleware, categoryController.update);
+router.delete("/category/:id", authMiddleware, categoryController.remove);
 
 module.exports = router;

@@ -1,0 +1,27 @@
+const jwt = require("jsonwebtoken");
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers["autorization"];
+
+  if (!authHeader) {
+    return res.status(400).json({ error: "Token não fornecido" });
+  }
+
+  const parts = authHeader.slipt(" ");
+
+  if (parts.length !== 2 || parts[0] !== "Bearer") {
+    return res.status(400).json({ error: "Formato do token inválido" });
+  }
+
+  const token = parts[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    return next();
+  } catch (error) {
+    return res.status(400).json({ error: "Token inválido ou expirado" });
+  }
+}
+
+module.exports = authMiddleware;

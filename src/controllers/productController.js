@@ -1,36 +1,47 @@
 const sequelize = require("../config/database");
-const { Product, ProductImage, ProductOption, Category } = require("../models");
+const { Product, ProductImage, ProductOption } = require("../models");
 const { saveBase64Image } = require("../services/imageService");
 
 async function create(req, res) {
+  const {
+    enabled = false,
+    name,
+    slug,
+    stock = 0,
+    description,
+    price,
+    price_with_discount,
+    category_ids = [],
+    images = [],
+    options = [],
+  } = req.body;
+
+  if (
+    !name ||
+    !slug ||
+    price === undefined ||
+    price_with_discount === undefined
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Campos obrigatórios não preenchidos" });
+  }
+
+  if (
+    !Array.isArray(category_ids) ||
+    !Array.isArray(images) ||
+    !Array.isArray(options)
+  ) {
+    return res
+      .status(400)
+      .json({
+        error: "Os campos category_ids, images e options devem ser listas",
+      });
+  }
+
   const transaction = await sequelize.transaction();
 
   try {
-    const {
-      enabled = false,
-      name,
-      slug,
-      stock = 0,
-      description,
-      price,
-      price_with_discount,
-      category_ids = [],
-      images = [],
-      options = [],
-    } = req.body;
-
-    if (
-      !name ||
-      !slug ||
-      price === undefined ||
-      price_with_discount === undefined
-    ) {
-      await transaction.rollback();
-      return res
-        .status(400)
-        .json({ error: "Campos obrigatórios não preenchidos" });
-    }
-
     const product = await Product.create(
       {
         enabled: Boolean(enabled),
@@ -44,11 +55,11 @@ async function create(req, res) {
       { transaction },
     );
 
-    if (Array.isArray(category_ids) && category_ids.length > 0) {
+    if (category_ids.length > 0) {
       await product.setCategories(category_ids, { transaction });
     }
 
-    if (Array.isArray(images) && images.length > 0) {
+    if (images.length > 0) {
       const imageRecords = images.map((img) => {
         const savedPath = saveBase64Image(img.content, img.type);
         return {
@@ -60,7 +71,7 @@ async function create(req, res) {
       await ProductImage.bulkCreate(imageRecords, { transaction });
     }
 
-    if (Array.isArray(options) && options.length > 0) {
+    if (options.length > 0) {
       const optionRecords = options.map((opt) => {
         let rawValues = opt.values || opt.value || [];
         const formattedValues = Array.isArray(rawValues)

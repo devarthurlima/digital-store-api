@@ -3,6 +3,7 @@ const cors = require("cors");
 const path = require("path");
 const userRoutes = require("./routes/userRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
+const productRoutes = require("./routes/productRoutes");
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(
 
 app.use("/v1", userRoutes);
 app.use("/v1", categoryRoutes);
+app.use("/v1", productRoutes);
 
 app.get("/", (req, res) => {
   return res.status(200).json({

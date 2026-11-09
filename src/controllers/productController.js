@@ -11,6 +11,7 @@ async function search(req, res) {
       match,
       category_ids,
       "price-range": priceRange,
+      option,
     } = req.query;
 
     const parsedLimit = parseInt(limit, 10);
@@ -51,6 +52,42 @@ async function search(req, res) {
       }
     }
 
+    const includeOptions = {
+      model: ProductOption,
+      as: "options",
+      attributes: ["id", "title", "shape", "radius", "type", "values"],
+    };
+
+    if (option && typeof option === "object") {
+      const optionConditions = [];
+
+      for (const [optionId, optionValues] of Object.entries(option)) {
+        const parsedOptionId = parseInt(optionId, 10);
+        const valuesList = String(optionValues)
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean);
+
+        const valueOrConditions = valuesList.map((val) => ({
+          values: { [Op.like]: `%${val}%` },
+        }));
+
+        const condition = {
+          id: parsedOptionId,
+        };
+
+        if (valueOrConditions.length > 0) {
+          condition[Op.or] = valueOrConditions;
+        }
+
+        optionConditions.push(condition);
+      }
+
+      if (optionConditions.length > 0) {
+        includeOptions.where = { [Op.or]: optionConditions };
+      }
+    }
+
     const queryOptions = {
       distinct: true,
       where: whereProduct,
@@ -61,11 +98,7 @@ async function search(req, res) {
           as: "images",
           attributes: ["id", "path"],
         },
-        {
-          model: ProductOption,
-          as: "options",
-          attributes: ["id", "title", "shape", "radius", "type", "values"],
-        },
+        includeOptions,
       ],
     };
 

@@ -2,6 +2,78 @@ const sequelize = require("../config/database");
 const { Product, ProductImage, ProductOption } = require("../models");
 const { saveBase64Image } = require("../services/imageService");
 
+async function search(req, res) {
+  try {
+    const { limit = 12, page = 1 } = req.query;
+
+    const parsedLimit = parseInt(limit, 10);
+    const parsedPage = parseInt(page, 10);
+
+    const queryOptions = {
+      distinct: true,
+      include: [
+        {
+          model: Category,
+          as: "categories",
+          attributes: ["id"],
+          through: { attributes: [] },
+        },
+        {
+          model: ProductImage,
+          as: "images",
+          attributes: ["id", "path"],
+        },
+        {
+          model: ProductOption,
+          as: "options",
+          attributes: ["id", "title", "shape", "radius", "type", "values"],
+        },
+      ],
+    };
+
+    if (parsedLimit !== -1) {
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+    }
+
+    const { rows: products, count: total } =
+      await Product.findAndCountAll(queryOptions);
+
+    const data = products.map((product) => ({
+      id: product.id,
+      enabled: product.enabled,
+      name: product.name,
+      slug: product.slug,
+      stock: product.stock,
+      description: product.description,
+      price: product.price,
+      price_with_discount: product.price_with_discount,
+      category_ids: product.categories.map((c) => c.id),
+      images: product.images.map((img) => ({
+        id: img.id,
+        content: img.path,
+      })),
+      options: product.options.map((opt) => ({
+        id: opt.id,
+        title: opt.title,
+        shape: opt.shape,
+        radius: opt.radius,
+        type: opt.type,
+        values: opt.values.split(","),
+      })),
+    }));
+
+    return res.status(200).json({
+      data,
+      total,
+      limit: parsedLimit,
+      page: parsedLimit === -1 ? 1 : parsedPage,
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
+
 async function create(req, res) {
   const {
     enabled = false,
@@ -164,6 +236,7 @@ async function getById(req, res) {
 }
 
 module.exports = {
+  search,
   create,
   getById,
 };

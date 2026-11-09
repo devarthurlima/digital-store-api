@@ -1,23 +1,61 @@
+const { Op } = require("sequelize");
 const sequelize = require("../config/database");
-const { Product, ProductImage, ProductOption } = require("../models");
+const { Product, ProductImage, ProductOption, Category } = require("../models");
 const { saveBase64Image } = require("../services/imageService");
 
 async function search(req, res) {
   try {
-    const { limit = 12, page = 1 } = req.query;
+    const {
+      limit = 12,
+      page = 1,
+      match,
+      category_ids,
+      "price-range": priceRange,
+    } = req.query;
 
     const parsedLimit = parseInt(limit, 10);
     const parsedPage = parseInt(page, 10);
 
+    const whereProduct = {};
+
+    if (match) {
+      whereProduct[Op.or] = [
+        { name: { [Op.like]: `%${match}%` } },
+        { description: { [Op.like]: `%${match}%` } },
+      ];
+    }
+
+    if (priceRange) {
+      const [minPrice, maxPrice] = priceRange
+        .split("-")
+        .map((val) => parseFloat(val));
+      if (!isNaN(minPrice) && !isNaN(maxPrice)) {
+        whereProduct.price = { [Op.between]: [minPrice, maxPrice] };
+      }
+    }
+
+    const includeCategories = {
+      model: Category,
+      as: "categories",
+      attributes: ["id"],
+      through: { attributes: [] },
+    };
+
+    if (category_ids) {
+      const ids = category_ids
+        .split(",")
+        .map((id) => parseInt(id.trim(), 10))
+        .filter(Boolean);
+      if (ids.length > 0) {
+        includeCategories.where = { id: { [Op.in]: ids } };
+      }
+    }
+
     const queryOptions = {
       distinct: true,
+      where: whereProduct,
       include: [
-        {
-          model: Category,
-          as: "categories",
-          attributes: ["id"],
-          through: { attributes: [] },
-        },
+        includeCategories,
         {
           model: ProductImage,
           as: "images",
@@ -104,9 +142,11 @@ async function create(req, res) {
     !Array.isArray(images) ||
     !Array.isArray(options)
   ) {
-    return res.status(400).json({
-      error: "Os campos category_ids, images e options devem ser listas",
-    });
+    return res
+      .status(400)
+      .json({
+        error: "Os campos category_ids, images e options devem ser listas",
+      });
   }
 
   const transaction = await sequelize.transaction();

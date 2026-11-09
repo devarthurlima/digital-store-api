@@ -32,11 +32,9 @@ async function create(req, res) {
     !Array.isArray(images) ||
     !Array.isArray(options)
   ) {
-    return res
-      .status(400)
-      .json({
-        error: "Os campos category_ids, images e options devem ser listas",
-      });
+    return res.status(400).json({
+      error: "Os campos category_ids, images e options devem ser listas",
+    });
   }
 
   const transaction = await sequelize.transaction();
@@ -106,6 +104,66 @@ async function create(req, res) {
   }
 }
 
+async function getById(req, res) {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findByPk(id, {
+      include: [
+        {
+          model: Category,
+          as: "categories",
+          attributes: ["id"],
+          through: { attributes: [] },
+        },
+        {
+          model: ProductImage,
+          as: "images",
+          attributes: ["id", "path"],
+        },
+        {
+          model: ProductOption,
+          as: "options",
+          attributes: ["id", "title", "shape", "radius", "type", "values"],
+        },
+      ],
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: "Produto não encontrado" });
+    }
+
+    const formattedProduct = {
+      id: product.id,
+      enabled: product.enabled,
+      name: product.name,
+      slug: product.slug,
+      stock: product.stock,
+      description: product.description,
+      price: product.price,
+      price_with_discount: product.price_with_discount,
+      category_ids: product.categories.map((c) => c.id),
+      images: product.images.map((img) => ({
+        id: img.id,
+        content: img.path,
+      })),
+      options: product.options.map((opt) => ({
+        id: opt.id,
+        title: opt.title,
+        shape: opt.shape,
+        radius: opt.radius,
+        type: opt.type,
+        values: opt.values.split(","),
+      })),
+    };
+
+    return res.status(200).json(formattedProduct);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
+
 module.exports = {
   create,
+  getById,
 };

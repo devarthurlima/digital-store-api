@@ -447,9 +447,26 @@ async function update(req, res) {
     return res.status(400).json({ error: error.message });
   }
 }
+
+async function remove(req, res) {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ error: "Produto não encontrado" });
+    }
+
+    await product.destroy();
+    return res.status(204).send();
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
 module.exports = {
   search,
   create,
   getById,
   update,
+  remove,
 };

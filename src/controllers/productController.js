@@ -175,11 +175,9 @@ async function create(req, res) {
     !Array.isArray(images) ||
     !Array.isArray(options)
   ) {
-    return res
-      .status(400)
-      .json({
-        error: "Os campos category_ids, images e options devem ser listas",
-      });
+    return res.status(400).json({
+      error: "Os campos category_ids, images e options devem ser listas",
+    });
   }
 
   const transaction = await sequelize.transaction();
@@ -308,8 +306,150 @@ async function getById(req, res) {
   }
 }
 
+async function update(req, res) {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const {
+      enabled,
+      name,
+      slug,
+      stock,
+      description,
+      price,
+      price_with_discount,
+      category_ids,
+      images,
+      options,
+    } = req.body;
+
+    const product = await Product.findByPk(id);
+    if (!product) {
+      await transaction.rollback();
+      return res.status(404).json({ error: "Produto não encontrado" });
+    }
+
+    const updateFields = {};
+    if (enabled !== undefined) updateFields.enabled = Boolean(enabled);
+    if (name) updateFields.name = name;
+    if (slug) updateFields.slug = slug;
+    if (stock !== undefined) updateFields.stock = parseInt(stock, 10) || 0;
+    if (description !== undefined) updateFields.description = description;
+    if (price !== undefined) updateFields.price = parseFloat(price);
+    if (price_with_discount !== undefined)
+      updateFields.price_with_discount = parseFloat(price_with_discount);
+
+    await product.update(updateFields, { transaction });
+
+    if (Array.isArray(category_ids)) {
+      await product.setCategories(category_ids, { transaction });
+    }
+
+    if (Array.isArray(images)) {
+      for (const img of images) {
+        if (img.id && img.deleted) {
+          await ProductImage.destroy({
+            where: { id: img.id, product_id: product.id },
+            transaction,
+          });
+        } else if (img.id) {
+          const imgRecord = await ProductImage.findOne({
+            where: { id: img.id, product_id: product.id },
+            transaction,
+          });
+          if (imgRecord) {
+            const newPath = img.content
+              ? saveBase64Image(img.content, img.type)
+              : imgRecord.path;
+            await imgRecord.update({ path: newPath }, { transaction });
+          }
+        } else if (img.content) {
+          const savedPath = saveBase64Image(img.content, img.type);
+          await ProductImage.create(
+            {
+              product_id: product.id,
+              enabled: true,
+              path: savedPath,
+            },
+            { transaction },
+          );
+        }
+      }
+    }
+
+    if (Array.isArray(options)) {
+      for (const opt of options) {
+        if (opt.id && opt.deleted) {
+          await ProductOption.destroy({
+            where: { id: opt.id, product_id: product.id },
+            transaction,
+          });
+        } else if (opt.id) {
+          const optRecord = await ProductOption.findOne({
+            where: { id: opt.id, product_id: product.id },
+            transaction,
+          });
+          if (optRecord) {
+            let rawValues = opt.values || opt.value || optRecord.values;
+            const formattedValues = Array.isArray(rawValues)
+              ? rawValues.join(",")
+              : String(rawValues);
+
+            let parsedRadius = optRecord.radius;
+            if (opt.radius !== undefined) {
+              parsedRadius =
+                parseInt(String(opt.radius).replace("px", ""), 10) || 0;
+            }
+
+            await optRecord.update(
+              {
+                title: opt.title || optRecord.title,
+                shape: opt.shape || optRecord.shape,
+                radius: parsedRadius,
+                type: opt.type || optRecord.type,
+                values: formattedValues,
+              },
+              { transaction },
+            );
+          }
+        } else if (opt.title) {
+          let rawValues = opt.values || opt.value || [];
+          const formattedValues = Array.isArray(rawValues)
+            ? rawValues.join(",")
+            : String(rawValues);
+
+          let parsedRadius = 0;
+          if (opt.radius) {
+            parsedRadius =
+              parseInt(String(opt.radius).replace("px", ""), 10) || 0;
+          }
+
+          await ProductOption.create(
+            {
+              product_id: product.id,
+              title: opt.title,
+              shape: opt.shape || "square",
+              radius: parsedRadius,
+              type: opt.type || "text",
+              values: formattedValues,
+            },
+            { transaction },
+          );
+        }
+      }
+    }
+
+    await transaction.commit();
+    return res.status(204).send();
+  } catch (error) {
+    await transaction.rollback();
+    return res.status(400).json({ error: error.message });
+  }
+}
 module.exports = {
   search,
   create,
   getById,
+  update,
 };

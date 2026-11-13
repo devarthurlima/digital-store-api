@@ -9,6 +9,9 @@ describe('Módulos de Categorias e Produtos', () => {
   let categoryId;
   let productId;
 
+  const validBase64Png =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
   beforeAll(async () => {
     await sequelize.sync();
 
@@ -20,12 +23,20 @@ describe('Módulos de Categorias e Produtos', () => {
       password: 'Password123!',
       confirmPassword: 'Password123!'
     });
+
+    if (userRes.status !== 201) {
+      console.log('Falha ao criar usuário no beforeAll:', userRes.status, userRes.body);
+    }
     userId = userRes.body.id;
 
     const tokenRes = await request(app).post('/v1/user/token').send({
       email,
       password: 'Password123!'
     });
+
+    if (tokenRes.status !== 200) {
+      console.log('Falha ao gerar token no beforeAll:', tokenRes.status, tokenRes.body);
+    }
     authToken = tokenRes.body.token;
   });
 
@@ -46,6 +57,7 @@ describe('Módulos de Categorias e Produtos', () => {
         use_in_menu: true
       });
 
+    if (res.status !== 201) console.log('Erro POST /v1/category:', res.body);
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('id');
     categoryId = res.body.id;
@@ -73,7 +85,7 @@ describe('Módulos de Categorias e Produtos', () => {
         images: [
           {
             type: 'image/png',
-            content: 'https://exemplo.com/tenis.png'
+            content: validBase64Png
           }
         ],
         options: [
@@ -87,6 +99,7 @@ describe('Módulos de Categorias e Produtos', () => {
         ]
       });
 
+    if (res.status !== 201) console.log('Erro POST /v1/product:', res.body);
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('id');
     productId = res.body.id;

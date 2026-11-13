@@ -1,13 +1,13 @@
 const jwt = require("jsonwebtoken");
 
 function authMiddleware(req, res, next) {
-  const authHeader = req.headers["autorization"];
+  const authHeader = req.headers["authorization"];
 
   if (!authHeader) {
     return res.status(400).json({ error: "Token não fornecido" });
   }
 
-  const parts = authHeader.slipt(" ");
+  const parts = authHeader.split(" ");
 
   if (parts.length !== 2 || parts[0] !== "Bearer") {
     return res.status(400).json({ error: "Formato do token inválido" });
